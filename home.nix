@@ -5,6 +5,7 @@
     bat
     eza
     fd
+    gh
     jq
     ripgrep
   ];
@@ -18,6 +19,12 @@
     defaultEditor = true;
     viAlias = true;
     vimAlias = true;
+    initLua = ''
+    vim.opt.clipboard = "unnamedplus"
+    if vim.env.SSH_TTY ~= nil or vim.env.SSH_CONNECTION ~= nil then
+      vim.g.clipboard = "osc52"
+    end
+    '';
   };
 
   home.shellAliases = {

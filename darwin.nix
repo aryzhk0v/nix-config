@@ -1,4 +1,4 @@
-{ username, ... }:
+{ pkgs, username, ... }:
 
 let
   homeDirectory = "/Users/${username}";
@@ -8,10 +8,21 @@ in
 
   system.primaryUser = username;
 
+  programs.zsh = {
+    enable = true;
+
+    # Home Manager manages fpath and compinit itself.
+    enableGlobalCompInit = false;
+  };
   users.users.${username} = {
     name = username;
     home = homeDirectory;
+    shell = pkgs.zsh;
   };
+
+  environment.shells = [
+    pkgs.zsh
+  ];
 
   homebrew = {
     enable = true;
@@ -28,6 +39,7 @@ in
       "firefox"
       # "font-terminus"
       "visual-studio-code"
+      "openlogi"
     ];
   };
 
@@ -52,6 +64,8 @@ in
 
       # Alacritty is installed manually, but its configuration is declarative.
       xdg.configFile."alacritty/alacritty.toml".text = ''
+        [terminal]
+	shell = { program = "/run/current-system/sw/bin/zsh", args = ["-l"] }
         [window]
         option_as_alt = "Both"
 

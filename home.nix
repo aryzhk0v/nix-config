@@ -1,4 +1,3 @@
-#{ pkgs, ... }:
 { pkgs, lib, ... }:
 
 {
@@ -6,6 +5,7 @@
     bat
     eza
     fd
+    fzf
     gh
     jq
     lf
@@ -23,28 +23,32 @@
   programs.zsh = {
     enable = true;
 
+    # Keep the Nix/macOS duplicate function-tree fix.
     initContent = lib.mkOrder 560 ''
       if [[ -d "${pkgs.zsh}/share/zsh/$ZSH_VERSION/functions" ]]; then
-        fpath=(''${fpath:#*/share/zsh/*/functions})
-        fpath=(
-          "${pkgs.zsh}/share/zsh/$ZSH_VERSION/functions"
-          $fpath
-        )
+	fpath=(''${fpath:#*/share/zsh/*/functions})
+	fpath=(
+	  "${pkgs.zsh}/share/zsh/$ZSH_VERSION/functions"
+	  $fpath
+	)
       fi
     '';
+    oh-my-zsh = {
+      enable = true;
+      
+      extraConfig = ''
+	zstyle ':omz:update' mode disabled
+      '';
 
-    completionInit = ''
-      autoload -Uz compinit
+      plugins = [
+	"git"
+	"sudo"
+	"extract"
+	"fzf"
+      ];
 
-      mkdir -p "$HOME/.cache/zsh"
-      dump="$HOME/.cache/zsh/zcompdump-$ZSH_VERSION"
-
-      if [[ -r "$dump" ]]; then
-        compinit -C -d "$dump"
-      else
-        compinit -d "$dump"
-      fi
-    '';
+      theme = "afowler";
+    };
   };
 
   programs.home-manager.enable = true;

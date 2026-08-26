@@ -38,6 +38,7 @@
       
       extraConfig = ''
 	zstyle ':omz:update' mode disabled
+	ZSH_DISABLE_COMPFIX=true
       '';
 
       plugins = [
@@ -59,10 +60,10 @@
     viAlias = true;
     vimAlias = true;
     initLua = ''
-    vim.opt.clipboard = "unnamedplus"
-    if vim.env.SSH_TTY ~= nil or vim.env.SSH_CONNECTION ~= nil then
-      vim.g.clipboard = "osc52"
-    end
+      vim.opt.clipboard = "unnamedplus"
+      if vim.env.SSH_TTY ~= nil or vim.env.SSH_CONNECTION ~= nil then
+	vim.g.clipboard = "osc52"
+      end
     '';
   };
 

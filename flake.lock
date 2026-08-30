@@ -82,7 +82,6 @@
         "nixpkgs-linux": "nixpkgs-linux",
         "tmux-current-pane-hostname": "tmux-current-pane-hostname",
         "tmux-ssh-split": "tmux-ssh-split",
-        "tmux-suspend": "tmux-suspend",
         "tmux-tilish": "tmux-tilish"
       }
     },
@@ -115,22 +114,6 @@
       "original": {
         "owner": "pschmitt",
         "repo": "tmux-ssh-split",
-        "type": "github"
-      }
-    },
-    "tmux-suspend": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1673761096,
-        "narHash": "sha256-+1fKkwDmr5iqro0XeL8gkjOGGB/YHBD25NG+w3iW+0g=",
-        "owner": "MunifTanjim",
-        "repo": "tmux-suspend",
-        "rev": "1a2f806666e0bfed37535372279fa00d27d50d14",
-        "type": "github"
-      },
-      "original": {
-        "owner": "MunifTanjim",
-        "repo": "tmux-suspend",
         "type": "github"
       }
     },

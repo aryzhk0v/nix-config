@@ -25,11 +25,6 @@
       flake = false;
     };
 
-    tmux-suspend = {
-      url = "github:MunifTanjim/tmux-suspend";
-      flake = false;
-    };
-
     tmux-ssh-split = {
       url = "github:pschmitt/tmux-ssh-split";
       flake = false;

@@ -29,11 +29,6 @@ let
     src = inputs.tmux-tilish.outPath;
   };
 
-  tmuxSuspend = mkTmuxPlugin {
-    name = "suspend";
-    src = inputs.tmux-suspend.outPath;
-  };
-
   tmuxSshSplit = mkTmuxPlugin {
     name = "ssh-split";
     src = inputs.tmux-ssh-split.outPath;
@@ -68,15 +63,6 @@ in
     plugins = [
       currentPaneHostname
       tmuxTilish
-
-      {
-        plugin = pkgs.tmuxPlugins.resurrect;
-        extraConfig = ''
-          set-option -g @resurrect-processes 'ranger'
-        '';
-      }
-
-      tmuxSuspend
 
       {
         plugin = tmuxSshSplit;

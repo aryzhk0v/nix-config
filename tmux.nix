@@ -54,6 +54,10 @@ in
     keyMode = "vi";
     mouse = false;
 
+    # Preserve the useful behavior previously enabled by tmux-sensible.
+    focusEvents = true;
+    aggressiveResize = true;
+
     shell = "${pkgs.zsh}/bin/zsh";
     terminal = "screen-256color";
 
@@ -62,7 +66,6 @@ in
     secureSocket = false;
 
     plugins = [
-      pkgs.tmuxPlugins.sensible
       currentPaneHostname
       tmuxTilish
 
@@ -73,7 +76,6 @@ in
         '';
       }
 
-      pkgs.tmuxPlugins.yank
       tmuxSuspend
 
       {

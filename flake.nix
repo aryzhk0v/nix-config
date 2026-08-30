@@ -14,10 +14,30 @@
       url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    tmux-current-pane-hostname = {
+      url = "github:soyuka/tmux-current-pane-hostname";
+      flake = false;
+    };
+
+    tmux-tilish = {
+      url = "github:aryzhk0v/tmux-tilish";
+      flake = false;
+    };
+
+    tmux-suspend = {
+      url = "github:MunifTanjim/tmux-suspend";
+      flake = false;
+    };
+
+    tmux-ssh-split = {
+      url = "github:pschmitt/tmux-ssh-split";
+      flake = false;
+    };
   };
 
   outputs =
-    {
+    inputs@{
       nixpkgs-linux,
       nix-darwin,
       home-manager,
@@ -32,7 +52,7 @@
       darwinConfigurations.${darwinHostname} =
         nix-darwin.lib.darwinSystem {
           specialArgs = {
-            inherit username;
+            inherit inputs username;
           };
 
           modules = [
@@ -46,7 +66,7 @@
           pkgs = nixpkgs-linux.legacyPackages.${linuxSystem};
 
           extraSpecialArgs = {
-            inherit username;
+            inherit inputs username;
           };
 
           modules = [

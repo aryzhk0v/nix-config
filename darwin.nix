@@ -1,4 +1,4 @@
-{ pkgs, username, ... }:
+{ inputs, pkgs, username, ... }:
 
 let
   homeDirectory = "/Users/${username}";
@@ -48,9 +48,9 @@ in
     useUserPackages = true;
     backupFileExtension = "backup";
 
-    # Make username available to imported Home Manager modules.
+    # Make shared values and flake inputs available to Home Manager modules.
     extraSpecialArgs = {
-      inherit username;
+      inherit inputs username;
     };
 
     users.${username} = { ... }: {

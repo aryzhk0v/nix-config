@@ -1,6 +1,10 @@
 { pkgs, lib, ... }:
 
 {
+  imports = [
+    ./tmux.nix
+  ];
+
   home.packages = with pkgs; [
     bat
     eza
@@ -35,7 +39,7 @@
     '';
     oh-my-zsh = {
       enable = true;
-      
+
       extraConfig = ''
 	zstyle ':omz:update' mode disabled
 	ZSH_DISABLE_COMPFIX=true

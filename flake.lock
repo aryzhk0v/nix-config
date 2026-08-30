@@ -79,7 +79,75 @@
         "home-manager": "home-manager",
         "nix-darwin": "nix-darwin",
         "nixpkgs": "nixpkgs",
-        "nixpkgs-linux": "nixpkgs-linux"
+        "nixpkgs-linux": "nixpkgs-linux",
+        "tmux-current-pane-hostname": "tmux-current-pane-hostname",
+        "tmux-ssh-split": "tmux-ssh-split",
+        "tmux-suspend": "tmux-suspend",
+        "tmux-tilish": "tmux-tilish"
+      }
+    },
+    "tmux-current-pane-hostname": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1765812655,
+        "narHash": "sha256-t5jRUvwiwym6f7vfKD/D0Vu1UXpxRMCLNyBbY0nZciw=",
+        "owner": "soyuka",
+        "repo": "tmux-current-pane-hostname",
+        "rev": "0a8a187afcdf258e32a6b014105c12d344b670a5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "soyuka",
+        "repo": "tmux-current-pane-hostname",
+        "type": "github"
+      }
+    },
+    "tmux-ssh-split": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1773127677,
+        "narHash": "sha256-v/8Jo62tisVMqmgTge/nZtFBgFHQxIt/wGCZ48znUIk=",
+        "owner": "pschmitt",
+        "repo": "tmux-ssh-split",
+        "rev": "cf4577613a49736a5bc17e5ae01112ff42ee53c4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pschmitt",
+        "repo": "tmux-ssh-split",
+        "type": "github"
+      }
+    },
+    "tmux-suspend": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1673761096,
+        "narHash": "sha256-+1fKkwDmr5iqro0XeL8gkjOGGB/YHBD25NG+w3iW+0g=",
+        "owner": "MunifTanjim",
+        "repo": "tmux-suspend",
+        "rev": "1a2f806666e0bfed37535372279fa00d27d50d14",
+        "type": "github"
+      },
+      "original": {
+        "owner": "MunifTanjim",
+        "repo": "tmux-suspend",
+        "type": "github"
+      }
+    },
+    "tmux-tilish": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787727458,
+        "narHash": "sha256-nD9uM/wOX++1GEdHiu6GqaVxSdQuekycmsirwP3TO7M=",
+        "owner": "aryzhk0v",
+        "repo": "tmux-tilish",
+        "rev": "e9ead18dbb7bca5432e60f3a0c7ddc49813cc2e7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aryzhk0v",
+        "repo": "tmux-tilish",
+        "type": "github"
       }
     }
   },

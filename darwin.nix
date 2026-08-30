@@ -37,7 +37,7 @@ in
 
     casks = [
       "firefox"
-      # "font-terminus"
+      "hammerspoon"
       "visual-studio-code"
       "openlogi"
     ];
@@ -61,6 +61,10 @@ in
 
       # Keep GUI applications owned by Homebrew or manual installations.
       targets.darwin.copyApps.enable = false;
+
+      # Hammerspoon reads its configuration from ~/.hammerspoon/init.lua.
+      home.file.".hammerspoon/init.lua".source =
+        ./config/hammerspoon/init.lua;
 
       # Alacritty is installed manually, but its configuration is declarative.
       xdg.configFile."alacritty/alacritty.toml".text = ''

@@ -7,12 +7,20 @@
 
   home.packages = with pkgs; [
     bat
+    chawan
+    curl
+    dig
     eza
     fd
+    fdupes
     fzf
     gh
-    jq
     lf
+    monolith
+    ncdu
+    jq
+    pass
+    rclone
     ripgrep
   ];
 

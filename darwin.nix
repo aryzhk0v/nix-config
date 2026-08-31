@@ -37,9 +37,10 @@ in
 
     casks = [
       "firefox"
+      "grandperspective"
       "hammerspoon"
-      "visual-studio-code"
       "openlogi"
+      "visual-studio-code"
     ];
   };
 

@@ -1,0 +1,712 @@
+# lf configuration adapted from the ranger setup in ../ranger.
+# Install this directory as ~/.config/lf (see README.md).
+
+# -----------------------------------------------------------------------------
+# Behaviour and appearance
+# -----------------------------------------------------------------------------
+
+set shell sh
+set shellopts '-eu'
+set ifs "\n"
+
+set ratios 1:3:4
+set scrolloff 8
+set mouse true
+set preview true
+set dirpreviews true
+set preload false
+set previewer ~/.config/lf/previewer
+set cursorpreviewfmt "\033[7m"
+
+set hidden false
+set hiddenfiles ".*:*.pyc:*.pyo:*.bak:*.swp:lost+found:__cache__:__pycache__"
+set sortby natural
+set reverse false
+set sortignorecase true
+set dirfirst true
+set info size:custom
+set history true
+set wrapscroll false
+set selmode dir
+set preserve mode:timestamps
+set period 0
+set watch true
+set icons false
+
+# Preview switches used by previewer. "auto" keeps sixel on Linux and uses
+# terminal-safe symbol previews on macOS and in Alacritty.
+set user_images true
+set user_image_format auto
+set user_preview_script true
+set user_vcs true
+
+# -----------------------------------------------------------------------------
+# Commands
+# -----------------------------------------------------------------------------
+
+# Text and source files open in the terminal editor. Everything else follows
+# the preferences in ~/.config/lf/opener, the equivalent of ranger's rifle.conf.
+cmd open &{{
+    set -f
+    mime="$(file -Lb --mime-type "$f" 2>/dev/null ||
+        file --dereference --brief --mime-type -- "$f")"
+    case "$mime" in
+        text/html)
+            ~/.config/lf/opener $fx
+            ;;
+        text/*|*/xml|application/json|application/x-shellscript)
+            editor="${EDITOR:-vi}"
+            editor="${VISUAL:-$editor}"
+            lf -remote "send $id \$$editor \$fx"
+            ;;
+        *)
+            ~/.config/lf/opener $fx
+            ;;
+    esac
+}}
+
+cmd edit ${{
+    set -f
+    editor="${EDITOR:-vi}"
+    editor="${VISUAL:-$editor}"
+    "$editor" -- $fx
+}}
+
+cmd display-file ${{
+    set -f
+    ~/.config/lf/previewer "$f" "${lf_width:-80}" "${lf_height:-40}" 0 0 preview |
+        less -R
+}}
+
+cmd terminal $${SHELL:-sh}
+cmd open-with-gui &"$@" $fx
+cmd open-with-tui $"$@" $fx
+cmd open-with-cli %"$@" $fx
+
+cmd log ${{
+    if [ -n "${lf_flag_log:-}" ] && [ -f "$lf_flag_log" ]; then
+        "${PAGER:-less}" "$lf_flag_log"
+    else
+        printf '%s\n' 'lf logging is disabled; start lf with: lf -log /path/to/log'
+        printf '%s' 'Press enter to continue... '
+        read _answer
+    fi
+}}
+
+cmd mkdir %IFS=" "; mkdir -p -- "$*"
+cmd touch %IFS=" "; touch -- "$*"
+cmd chmod-mode %chmod "$1" $fx
+
+cmd delete ${{
+    set -f
+    printf '%s\n' "$fx"
+    printf 'delete permanently? [y/N] '
+    read answer
+    [ "$answer" = y ] || [ "$answer" = Y ] || exit 0
+    rm -rf $fx
+}}
+
+cmd trash %{{
+    set -f
+    if [ "$(uname -s)" = Darwin ] && command -v trash >/dev/null 2>&1; then
+        trash $fx
+    elif [ "$(uname -s)" = Darwin ] && command -v osascript >/dev/null 2>&1; then
+        for path in $fx; do
+            osascript \
+                -e 'on run argv' \
+                -e 'tell application "Finder" to delete POSIX file (item 1 of argv)' \
+                -e 'end run' \
+                "$path"
+        done
+    elif command -v trash-put >/dev/null 2>&1; then
+        trash-put $fx
+    elif command -v trash >/dev/null 2>&1; then
+        trash $fx
+    else
+        lf -remote "send $id echoerr 'No trash command is available'"
+    fi
+}}
+
+cmd trash-empty ${{
+    if [ "$(uname -s)" = Darwin ] && command -v osascript >/dev/null 2>&1; then
+        osascript -e 'tell application "Finder" to empty trash'
+    elif command -v trash-empty >/dev/null 2>&1; then
+        trash-empty
+    else
+        printf '%s\n' 'No command for emptying the trash is available'
+        printf '%s' 'Press enter to continue... '
+        read _answer
+    fi
+}}
+
+cmd trash-restore ${{
+    if [ "$(uname -s)" = Darwin ] && command -v open >/dev/null 2>&1; then
+        open "$HOME/.Trash"
+        printf '%s\n' 'The Trash was opened in Finder; restore items there.'
+        printf '%s' 'Press enter to continue... '
+        read _answer
+    elif command -v trash-restore >/dev/null 2>&1; then
+        trash-restore
+    else
+        printf '%s\n' 'No command for restoring trash items is available'
+        printf '%s' 'Press enter to continue... '
+        read _answer
+    fi
+}}
+
+cmd fzf-jump ${{
+    if ! command -v fzf >/dev/null 2>&1; then
+        printf '%s\n' 'fzf is not installed'
+        printf '%s' 'Press enter to continue... '
+        read _answer
+        exit 0
+    fi
+    target="$(find -L . -mindepth 1 -print 2>/dev/null | fzf)"
+    [ -n "$target" ] || exit 0
+    case "$target" in
+        /*) ;;
+        *) target="$PWD/${target#./}" ;;
+    esac
+    if command -v realpath >/dev/null 2>&1; then
+        target="$(realpath "$target")"
+    elif [ -d "$target" ]; then
+        target="$(CDPATH= cd -P "$target" && pwd -P)"
+    else
+        target_dir="$(dirname "$target")"
+        target_name="$(basename "$target")"
+        target_dir="$(CDPATH= cd -P "$target_dir" && pwd -P)"
+        target="$target_dir/$target_name"
+    fi
+    escaped="$(printf '%s' "$target" | sed 's/\\/\\\\/g;s/"/\\"/g')"
+    if [ -d "$target" ]; then
+        lf -remote "send $id cd \"$escaped\""
+    else
+        lf -remote "send $id select \"$escaped\""
+    fi
+}}
+
+cmd paste-overwrite %{{
+    data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+    data_home="${LF_DATA_HOME:-$data_home}"
+    buffer="$data_home/lf/files"
+    [ -s "$buffer" ] || exit 0
+    set -- $(cat "$buffer")
+    mode="$1"
+    shift
+    case "$mode" in
+        copy) cp -Rf "$@" . ;;
+        move) mv -f "$@" .; lf -remote "send $id clear" ;;
+    esac
+}}
+
+cmd paste-symlink %{{
+    data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+    data_home="${LF_DATA_HOME:-$data_home}"
+    buffer="$data_home/lf/files"
+    [ -s "$buffer" ] || exit 0
+    set -- $(cat "$buffer")
+    shift
+    [ "$#" -gt 0 ] || exit 0
+    for source in "$@"; do
+        ln -s "$source" .
+    done
+}}
+
+cmd paste-relative-symlink %{{
+    data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+    data_home="${LF_DATA_HOME:-$data_home}"
+    buffer="$data_home/lf/files"
+    [ -s "$buffer" ] || exit 0
+    set -- $(cat "$buffer")
+    shift
+    [ "$#" -gt 0 ] || exit 0
+    relative_path() {
+        source="$1"
+        destination="$2"
+        source_dir="$(dirname "$source")"
+        source_name="$(basename "$source")"
+        source_dir="$(CDPATH= cd -P "$source_dir" && pwd -P)" || return 1
+        destination="$(CDPATH= cd -P "$destination" && pwd -P)" || return 1
+
+        from="${destination#/}"
+        to="${source_dir#/}"
+        while [ -n "$from" ] && [ -n "$to" ]; do
+            from_part="${from%%/*}"
+            to_part="${to%%/*}"
+            [ "$from_part" = "$to_part" ] || break
+            case "$from" in */*) from="${from#*/}" ;; *) from='' ;; esac
+            case "$to" in */*) to="${to#*/}" ;; *) to='' ;; esac
+        done
+
+        relative=''
+        while [ -n "$from" ]; do
+            relative="../$relative"
+            case "$from" in */*) from="${from#*/}" ;; *) from='' ;; esac
+        done
+        [ -z "$to" ] || relative="${relative}${to}/"
+        printf '%s%s\n' "$relative" "$source_name"
+    }
+    for source in "$@"; do
+        relative="$(relative_path "$source" "$PWD")" || exit 1
+        ln -s "$relative" .
+    done
+}}
+
+cmd paste-hardlink %{{
+    data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+    data_home="${LF_DATA_HOME:-$data_home}"
+    buffer="$data_home/lf/files"
+    [ -s "$buffer" ] || exit 0
+    set -- $(cat "$buffer")
+    shift
+    [ "$#" -gt 0 ] || exit 0
+    for source in "$@"; do
+        ln "$source" .
+    done
+}}
+
+cmd cut-add %~/.config/lf/lf-buffer add move
+cmd cut-remove %~/.config/lf/lf-buffer remove move
+cmd cut-toggle %~/.config/lf/lf-buffer toggle move
+cmd copy-add %~/.config/lf/lf-buffer add copy
+cmd copy-remove %~/.config/lf/lf-buffer remove copy
+cmd copy-toggle %~/.config/lf/lf-buffer toggle copy
+
+cmd toggle-preview &{{
+    if [ "$lf_preview" = true ]; then
+        lf -remote "send $id :set preview false; set ratios 1:4"
+    else
+        lf -remote "send $id :set ratios 1:3:4; set preview true"
+    fi
+}}
+
+cmd toggle-images &{{
+    if [ "$lf_user_images" = true ]; then
+        lf -remote "send $id :set user_images false; reload"
+    else
+        lf -remote "send $id :set user_images true; reload"
+    fi
+}}
+
+cmd toggle-preview-script &{{
+    if [ "$lf_user_preview_script" = true ]; then
+        lf -remote "send $id :set user_preview_script false; reload"
+    else
+        lf -remote "send $id :set user_preview_script true; reload"
+    fi
+}}
+
+cmd no-feature &{{
+    message="$(printf '%s' "$*" | sed 's/\\/\\\\/g;s/"/\\"/g')"
+    lf -remote "send $id echoerr \"$message\""
+}}
+
+cmd cd-removable &{{
+    if [ "$(uname -s)" = Darwin ]; then
+        target="/Volumes"
+    elif [ -d "/run/media/${USER}" ]; then
+        target="/run/media/${USER}"
+    elif [ -d "/media/${USER}" ]; then
+        target="/media/${USER}"
+    else
+        target="/media"
+    fi
+    escaped="$(printf '%s' "$target" | sed 's/\\/\\\\/g;s/"/\\"/g')"
+    lf -remote "send $id cd \"$escaped\""
+}}
+
+cmd cd-trash &{{
+    if [ "$(uname -s)" = Darwin ]; then
+        target="$HOME/.Trash"
+    else
+        target="${XDG_DATA_HOME:-$HOME/.local/share}/Trash/files"
+    fi
+    escaped="$(printf '%s' "$target" | sed 's/\\/\\\\/g;s/"/\\"/g')"
+    lf -remote "send $id cd \"$escaped\""
+}}
+
+cmd cd-remote &{{
+    target="$HOME/remote"
+    escaped="$(printf '%s' "$target" | sed 's/\\/\\\\/g;s/"/\\"/g')"
+    lf -remote "send $id cd \"$escaped\""
+}}
+
+cmd follow-link &{{
+    target="$(readlink "$f")" || exit 0
+    case "$target" in
+        /*) ;;
+        *) target="$(dirname "$f")/$target" ;;
+    esac
+    escaped="$(printf '%s' "$target" | sed 's/\\/\\\\/g;s/"/\\"/g')"
+    lf -remote "send $id select \"$escaped\""
+}}
+
+cmd du-one-level ${{
+    set -f
+    if du --version >/dev/null 2>&1; then
+        du --max-depth=1 -h --apparent-size "$f"
+    else
+        du -d 1 -h "$f"
+    fi
+}}
+
+cmd du-one-level-sorted ${{
+    set -f
+    if du --version >/dev/null 2>&1; then
+        du --max-depth=1 -h --apparent-size "$f" | sort -rh
+    else
+        du -d 1 -h "$f" | sort -rh
+    fi
+}}
+
+cmd unmount-selected ${{
+    if [ "$(uname -s)" = Darwin ] && command -v diskutil >/dev/null 2>&1; then
+        diskutil unmount "$f"
+    else
+        sudo umount "$f"
+    fi
+}}
+
+cmd cmus-play &cmus-remote $fx
+cmd cmus-queue &cmus-remote -q $fx
+cmd cmus-lib &cmus-remote -l $fx
+
+# Ranger's vcs_aware option, implemented with lf's custom info column.
+cmd on-load &{{
+    [ "$lf_user_vcs" = true ] || exit 0
+    command -v git >/dev/null 2>&1 || exit 0
+    cd "$(dirname -- "$1")" || exit 0
+    [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" = true ] || exit 0
+    commands=''
+    for path in "$@"; do
+        case "$path" in */.git|*/.git/*) continue ;; esac
+        status="$(git status --porcelain --ignored -- "$path" 2>/dev/null | cut -c1-2 | head -n 1)"
+        escaped_path="$(printf '%s' "$path" | sed 's/\\/\\\\/g;s/"/\\"/g')"
+        escaped_status="$(printf '%s' "$status" | sed 's/\\/\\\\/g;s/"/\\"/g')"
+        commands="${commands}addcustominfo \"${escaped_path}\" \"${escaped_status}\"; "
+    done
+    [ -z "$commands" ] || lf -remote "send $id :$commands"
+}}
+
+# -----------------------------------------------------------------------------
+# Browser key maps -- ranger muscle memory
+# -----------------------------------------------------------------------------
+
+# Start from a deliberate map set so lf defaults do not steal ranger prefixes.
+clearmaps
+
+map q quit
+map Q quit
+map ZZ quit
+map ZQ quit
+map R reload
+map <c-r> reload
+map <c-l> redraw
+nmap <c-c> redraw
+nmap <esc> redraw
+vmap <esc> visual-discard
+map F no-feature "lf has no freeze-files mode"
+map ~ no-feature "lf only has the Miller-style view"
+
+map i display-file
+map ? help
+map W log
+map w no-feature "lf has no task view; file operations appear in the ruler"
+map S terminal
+
+map ";" read
+map "!" push "!<space>"
+map "@" push "%<space>"
+map "#" push "%<space>"
+map s push "$<space>"
+map r push :open-with-gui<space>
+map f find
+map cd push :cd<space>
+map <c-p> :read; cmd-history-prev
+
+# Line modes / info columns
+map Mf set info
+map Mi set info perm:user:group:size:time:custom
+map Mm set info time:custom
+map Mp set info perm:custom
+map Ms set info size:time:custom
+map Mt set info custom
+
+# Tags and selections
+map t tag-toggle
+map ut :tag; tag-toggle
+map <space> :toggle; down
+map v invert
+map uv unselect
+map V visual
+map uV invert
+vmap V visual-accept
+vmap u visual-unselect
+vmap yy :visual-accept; copy
+vmap dd :visual-accept; cut
+
+# Function and cursor keys
+map <f-1> help
+map <f-2> rename
+map <f-3> display-file
+map <f-4> edit
+map <f-5> copy
+map <f-6> cut
+map <f-7> push :mkdir<space>
+map <f-8> delete
+map <f-10> quit
+map <up> up
+map <down> down
+map <left> updir
+map <right> open
+map <home> top
+map <end> bottom
+map <pgdn> page-down
+map <pgup> page-up
+map <enter> open
+map <insert> push :touch<space>
+map <backspace> updir
+map k up
+map j down
+map h updir
+map l open
+map gg top
+map G bottom
+map <c-f> page-down
+map <c-b> page-up
+map J half-down
+map K half-up
+map <c-d> half-down
+map <c-u> half-up
+
+# History and parent-column movement
+map H jump-prev
+map L jump-next
+map [ jump-prev
+map ] jump-next
+map { :updir; up; open
+map } :updir; down; open
+map ) no-feature "ranger's jump_non has no lf equivalent"
+
+# Directory shortcuts
+map gh cd ~
+map ge cd /etc
+map gu cd /usr
+map gd cd /dev
+map gD cd ~/sync/Dropbox
+map gl cd .
+map gL follow-link
+map go cd /opt
+map gv cd /var
+map gm cd-removable
+map gi cd-removable
+map gM cd-removable
+map gs cd /srv
+map gp cd /tmp
+map g/ cd /
+map gR cd ~/.config/lf
+map g? help
+
+# Execution and external programs
+map ee $$f
+map ew !$f
+map es &$f
+map ep !$f
+map E edit
+map du du-one-level
+map dU du-one-level-sorted
+map yp %~/.config/lf/lf-clipboard path
+map yd %~/.config/lf/lf-clipboard dir
+map yn %~/.config/lf/lf-clipboard name
+map y. %~/.config/lf/lf-clipboard stem
+
+# Rename and permissions
+map = push :chmod-mode<space>
+map cw rename
+map a rename
+map A :rename; cmd-end
+map I :rename; cmd-home
+
+# Paste, delete, cut, and copy
+map pp paste
+map po paste-overwrite
+map pP no-feature "append-on-collision paste is not available in lf"
+map pO no-feature "append-and-overwrite paste is not available in lf"
+map pl paste-symlink
+map pL paste-relative-symlink
+map phl paste-hardlink
+map pht no-feature "hardlinked subtree paste is not available in lf"
+map dD delete
+map dd cut
+map ud clear
+map da cut-add
+map dr cut-remove
+map dt cut-toggle
+map yy copy
+map uy clear
+map ya copy-add
+map yr copy-remove
+map yt copy-toggle
+nmap dgg :visual; top; visual-accept; cut
+nmap dG :visual; bottom; visual-accept; cut
+nmap dj :visual; down; visual-accept; cut
+nmap dk :visual; up; visual-accept; cut
+nmap ygg :visual; top; visual-accept; copy
+nmap yG :visual; bottom; visual-accept; copy
+nmap yj :visual; down; visual-accept; copy
+nmap yk :visual; up; visual-accept; copy
+
+# Search
+map / search
+map n search-next
+map N search-prev
+map ct no-feature "tag-ordered search has no lf equivalent"
+map cs :set sortby size; set info size:custom
+map ci :set sortby ext; set info custom
+map cc :set sortby ctime; set info ctime:custom
+map cm :set sortby time; set info time:custom
+map ca :set sortby atime; set info atime:custom
+
+# lf intentionally has no tabs. Keep these mappings visible and explanatory.
+map <c-n> no-feature "lf has no tabs; use tmux or terminal tabs"
+map <c-w> no-feature "lf has no tabs; use tmux or terminal tabs"
+map <tab> no-feature "lf has no tabs; use tmux or terminal tabs"
+map <s-tab> no-feature "lf has no tabs; use tmux or terminal tabs"
+map <a-right> no-feature "lf has no tabs; use tmux or terminal tabs"
+map <a-left> no-feature "lf has no tabs; use tmux or terminal tabs"
+map gt no-feature "lf has no tabs; use tmux or terminal tabs"
+map gT no-feature "lf has no tabs; use tmux or terminal tabs"
+map gn no-feature "lf has no tabs; use tmux or terminal tabs"
+map gc no-feature "lf has no tabs; use tmux or terminal tabs"
+map uq no-feature "lf has no closed-tab restore"
+map <a-1> no-feature "lf has no tabs"
+map <a-2> no-feature "lf has no tabs"
+map <a-3> no-feature "lf has no tabs"
+map <a-4> no-feature "lf has no tabs"
+map <a-5> no-feature "lf has no tabs"
+map <a-6> no-feature "lf has no tabs"
+map <a-7> no-feature "lf has no tabs"
+map <a-8> no-feature "lf has no tabs"
+map <a-9> no-feature "lf has no tabs"
+
+# Sorting
+map or set reverse!
+map oz no-feature "lf has no random sort"
+map os :set sortby size; set info size:custom; set reverse false
+map ob :set sortby name; set info custom; set reverse false
+map on :set sortby natural; set info custom; set reverse false
+map om :set sortby time; set info time:custom; set reverse false
+map oc :set sortby ctime; set info ctime:custom; set reverse false
+map oa :set sortby atime; set info atime:custom; set reverse false
+map ot :set sortby ext; set info custom; set reverse false
+map oe :set sortby ext; set info custom; set reverse false
+map oS :set sortby size; set info size:custom; set reverse true
+map oB :set sortby name; set info custom; set reverse true
+map oN :set sortby natural; set info custom; set reverse true
+map oM :set sortby time; set info time:custom; set reverse true
+map oC :set sortby ctime; set info ctime:custom; set reverse true
+map oA :set sortby atime; set info atime:custom; set reverse true
+map oT :set sortby ext; set info custom; set reverse true
+map oE :set sortby ext; set info custom; set reverse true
+map dc calcdirsize
+
+# Settings and filters
+map zc toggle-preview
+map zd set dirfirst!
+map zh set hidden!
+map <c-h> set hidden!
+map zI no-feature "lf does not expose ranger's flushinput option"
+map zi toggle-images
+map zm set mouse!
+map zp toggle-preview
+map zP set dirpreviews!
+map zs set sortignorecase!
+map zu no-feature "lf calculates directory size on demand with dc"
+map zv toggle-preview-script
+map zf filter
+map zz filter
+map .n filter
+map .m no-feature "lf has one filter, not ranger's MIME filter stack"
+map .d set dironly true
+map .f set dironly false
+map .l no-feature "lf has no symlink-only filter"
+map .c setfilter
+map .p setfilter
+map .. no-feature "lf displays the active filter in its prompt"
+
+# Bookmarks (lf provides the same modal workflow as ranger)
+map ` mark-load
+map ' mark-load
+map m mark-save
+map um mark-remove
+map "\"" mark-remove
+
+# Ranger's generated chmod bindings
+map +ur chmod-mode u+r
+map +uw chmod-mode u+w
+map +ux chmod-mode u+x
+map +gr chmod-mode g+r
+map +gw chmod-mode g+w
+map +gx chmod-mode g+x
+map +or chmod-mode o+r
+map +ow chmod-mode o+w
+map +ox chmod-mode o+x
+map +ar chmod-mode a+r
+map +aw chmod-mode a+w
+map +ax chmod-mode a+x
+map -ur chmod-mode u-r
+map -uw chmod-mode u-w
+map -ux chmod-mode u-x
+map -gr chmod-mode g-r
+map -gw chmod-mode g-w
+map -gx chmod-mode g-x
+map -or chmod-mode o-r
+map -ow chmod-mode o-w
+map -ox chmod-mode o-x
+map -ar chmod-mode a-r
+map -aw chmod-mode a-w
+map -ax chmod-mode a-x
+
+# -----------------------------------------------------------------------------
+# Local/custom ranger mappings
+# -----------------------------------------------------------------------------
+
+map Dd trash
+map Do cd-trash
+map DE trash-empty
+map Dr trash-restore
+map gf fzf-jump
+
+map ,a &foobar2000 /add $fx
+map ,p &mocp -cap $fx
+map gy cd ~/sync/yandex-disk
+map gr cd-remote
+map Yp %yandex-disk publish "$f" | ~/.config/lf/lf-clipboard stdin
+map Yu %yandex-disk unpublish "$f"
+map Ys !yandex-disk status
+map ,u unmount-selected
+map ,f $ssfs.sh
+map ,g push :open-with-gui<space>glogg<space>
+
+# The ranger-cmus plugin had commands but no key mappings. They remain available
+# as :cmus-play, :cmus-queue, and :cmus-lib.
+
+# Command-line editing already closely matches ranger/readline. These explicit
+# aliases preserve the ranger spellings on terminals that report them distinctly.
+cmap <esc> cmd-escape
+cmap <c-c> cmd-interrupt
+cmap <c-p> cmd-history-prev
+cmap <c-n> cmd-history-next
+cmap <c-b> cmd-left
+cmap <c-f> cmd-right
+cmap <c-a> cmd-home
+cmap <c-e> cmd-end
+cmap <c-d> cmd-delete
+cmap <c-h> cmd-delete-back
+cmap <c-w> cmd-delete-unix-word
+cmap <c-k> cmd-delete-end
+cmap <c-u> cmd-delete-home
+cmap <c-y> cmd-yank
+cmap <a-b> cmd-word-back
+cmap <a-f> cmd-word
+cmap <a-d> cmd-delete-word

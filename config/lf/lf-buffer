@@ -1,0 +1,56 @@
+#!/bin/sh
+
+# Ranger-compatible add/remove/toggle operations for lf's copy/cut buffer.
+
+set -eu
+
+action="${1:?usage: lf-buffer add|remove|toggle copy|move}"
+mode="${2:?usage: lf-buffer add|remove|toggle copy|move}"
+case "$mode" in copy|move) ;; *) exit 2 ;; esac
+case "$action" in add|remove|toggle) ;; *) exit 2 ;; esac
+
+data_home="${LF_DATA_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}}"
+data_dir="$data_home/lf"
+buffer="$data_dir/files"
+mkdir -p "$data_dir"
+
+work="$(mktemp "$data_dir/files.XXXXXX")"
+items="$(mktemp "$data_dir/items.XXXXXX")"
+old="$(mktemp "$data_dir/old.XXXXXX")"
+trap 'rm -f "$work" "$items" "$old"' EXIT HUP INT TERM
+
+printf '%s\n' "${fx:-}" | awk 'NF && !seen[$0]++' >"$items"
+printf '%s\n' "$mode" >"$work"
+
+case "$action" in
+    add)
+        {
+            [ ! -f "$buffer" ] || sed -n '2,$p' "$buffer"
+            cat "$items"
+        } | awk 'NF && !seen[$0]++' >>"$work"
+        ;;
+    remove)
+        if [ -f "$buffer" ]; then
+            sed -n '2,$p' "$buffer" >"$old"
+            awk 'NR==FNR { remove[$0]=1; next } !($0 in remove)' \
+                "$items" "$old" >>"$work"
+        fi
+        ;;
+    toggle)
+        if [ -f "$buffer" ]; then
+            sed -n '2,$p' "$buffer" >"$old"
+        else
+            : >"$old"
+        fi
+        awk '
+            NR==FNR { selected[$0]=1; order[++count]=$0; next }
+            { old[$0]=1; if (!($0 in selected)) print }
+            END { for (i=1; i<=count; i++) if (!(order[i] in old)) print order[i] }
+        ' "$items" "$old" >>"$work"
+        ;;
+esac
+
+mv "$work" "$buffer"
+trap 'rm -f "$items" "$old"' EXIT HUP INT TERM
+lf_command="${lf:-lf}"
+"$lf_command" -remote "send $id :unselect; sync"

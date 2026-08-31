@@ -1,0 +1,62 @@
+#!/bin/sh
+
+# A compact rifle.conf replacement for non-text files. Text files are routed
+# to $VISUAL/$EDITOR by the open command in lfrc.
+
+set -eu
+
+[ "$#" -gt 0 ] || exit 0
+first="$1"
+mime="$(file -Lb --mime-type "$first" 2>/dev/null ||
+    file --dereference --brief --mime-type -- "$first")"
+name="${first##*/}"
+extension="${name##*.}"
+extension="$(printf '%s' "$extension" | tr '[:upper:]' '[:lower:]')"
+
+# Keep the notable explicit handlers from rifle.conf, then use desktop MIME
+# associations for the long tail of formats.
+case "$extension" in
+    exe)
+        command -v wine >/dev/null 2>&1 && exec wine -- "$@"
+        ;;
+    mm)
+        command -v freeplane >/dev/null 2>&1 && exec freeplane -- "$@"
+        ;;
+esac
+
+case "$mime" in
+    text/html)
+        for program in qutebrowser chromium firefox; do
+            command -v "$program" >/dev/null 2>&1 && exec "$program" -- "$@"
+        done
+        ;;
+    application/pdf)
+        for program in zathura okular mupdf evince; do
+            command -v "$program" >/dev/null 2>&1 && exec "$program" -- "$@"
+        done
+        ;;
+    image/*)
+        for program in pqiv sxiv feh display; do
+            command -v "$program" >/dev/null 2>&1 && exec "$program" -- "$@"
+        done
+        ;;
+    video/*|audio/*)
+        for program in mpv vlc; do
+            command -v "$program" >/dev/null 2>&1 && exec "$program" -- "$@"
+        done
+        ;;
+esac
+
+if command -v open >/dev/null 2>&1 && [ "$(uname -s)" = Darwin ]; then
+    exec open "$@"
+fi
+if command -v xdg-open >/dev/null 2>&1; then
+    for path in "$@"; do xdg-open "$path" >/dev/null 2>&1 & done
+    exit 0
+fi
+if command -v gio >/dev/null 2>&1; then
+    exec gio open "$@"
+fi
+
+printf '%s\n' 'No graphical opener found (open, xdg-open, or gio).' >&2
+exit 1

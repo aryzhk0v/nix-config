@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+
+# Adapted from ranger/scope.sh for lf's previewer interface:
+#   $1 path, $2 width, $3 height, $4 x, $5 y, $6 preview|preload
+
+set -o noclobber -o noglob -o nounset -o pipefail
+IFS=$'\n'
+
+FILE_PATH="${1}"
+PV_WIDTH="${2:-80}"
+PV_HEIGHT="${3:-40}"
+FILE_EXTENSION="${FILE_PATH##*.}"
+FILE_EXTENSION_LOWER="$(printf '%s' "$FILE_EXTENSION" | tr '[:upper:]' '[:lower:]')"
+
+HIGHLIGHT_SIZE_MAX=262143
+HIGHLIGHT_TABWIDTH=8
+HIGHLIGHT_STYLE=pablo
+PYGMENTIZE_STYLE=autumn
+
+try() {
+    "$@" 2>/dev/null
+}
+
+file_mime() {
+    file -Lb --mime-type "$1" 2>/dev/null ||
+        file --dereference --brief --mime-type -- "$1" 2>/dev/null
+}
+
+file_description() {
+    file -Lb "$1" 2>/dev/null ||
+        file --dereference --brief -- "$1" 2>/dev/null
+}
+
+file_size() {
+    stat -f '%z' "$1" 2>/dev/null ||
+        stat -c '%s' "$1" 2>/dev/null ||
+        wc -c <"$1"
+}
+
+image_format() {
+    local requested="${lf_user_image_format:-auto}"
+
+    if [[ "$requested" != auto ]]; then
+        printf '%s\n' "$requested"
+    elif [[ "$(uname -s)" == Darwin ]] ||
+        [[ "${TERM_PROGRAM:-}" == Alacritty ]] ||
+        [[ -n "${ALACRITTY_SOCKET:-}" ]]; then
+        # Alacritty and the standard macOS terminals do not render sixel.
+        printf '%s\n' symbols
+    else
+        # Preserve the previous default on Linux terminals.
+        printf '%s\n' sixel
+    fi
+}
+
+if [[ -d "$FILE_PATH" ]]; then
+    if command -v tree >/dev/null 2>&1; then
+        tree -a -C -L 2 "$FILE_PATH" 2>/dev/null || true
+    else
+        # BSD find (macOS) does not support GNU find's -printf primary.
+        (
+            cd "$FILE_PATH" || exit 1
+            find . -mindepth 1 -maxdepth 2 -print
+        ) 2>/dev/null | sed -n 's#^\./##;1,400p'
+    fi
+    exit 0
+fi
+
+if [[ "${lf_user_preview_script:-true}" != true ]]; then
+    sed -n '1,500p' "$FILE_PATH" 2>/dev/null ||
+        file_description "$FILE_PATH"
+    exit 0
+fi
+
+handle_extension() {
+    case "$FILE_EXTENSION_LOWER" in
+        a|ace|alz|arc|arj|bz|bz2|cab|cpio|deb|gz|jar|lha|lz|lzh|lzma|lzo|\
+        rpm|rz|t7z|tar|tbz|tbz2|tgz|tlz|txz|tz|tzo|war|xpi|xz|z|zip)
+            try atool --list -- "$FILE_PATH" && exit 0
+            try bsdtar --list --file "$FILE_PATH" && exit 0
+            try tar -tf "$FILE_PATH" && exit 0
+            ;;
+        rar)
+            try unrar lt -p- -- "$FILE_PATH" && exit 0
+            ;;
+        7z)
+            try 7zz l -p -- "$FILE_PATH" && exit 0
+            try 7z l -p -- "$FILE_PATH" && exit 0
+            ;;
+        pdf)
+            try pdftotext -l 10 -nopgbrk -q "$FILE_PATH" - |
+                fmt -w "$PV_WIDTH" && exit 0
+            try mutool draw -F txt -i "$FILE_PATH" 1-10 |
+                fmt -w "$PV_WIDTH" && exit 0
+            try exiftool "$FILE_PATH" && exit 0
+            ;;
+        torrent)
+            try transmission-show "$FILE_PATH" && exit 0
+            ;;
+        odt|ods|odp|sxw)
+            try odt2txt "$FILE_PATH" && exit 0
+            ;;
+        htm|html|xhtml)
+            try w3m -dump "$FILE_PATH" && exit 0
+            try lynx -dump -- "$FILE_PATH" && exit 0
+            try elinks -dump "$FILE_PATH" && exit 0
+            ;;
+        json)
+            try jq --color-output . "$FILE_PATH" && exit 0
+            try python3 -m json.tool "$FILE_PATH" && exit 0
+            try python -m json.tool "$FILE_PATH" && exit 0
+            ;;
+    esac
+}
+
+handle_mime() {
+    local mimetype="$1"
+    local size
+    case "$mimetype" in
+        text/*|*/xml|application/json|application/x-shellscript)
+            size="$(file_size "$FILE_PATH" 2>/dev/null || printf 0)"
+            if [[ "$size" -gt "$HIGHLIGHT_SIZE_MAX" ]]; then
+                sed -n '1,500p' "$FILE_PATH"
+                exit 0
+            fi
+            if command -v highlight >/dev/null 2>&1; then
+                local highlight_format=ansi
+                [[ "$(tput colors 2>/dev/null || printf 0)" -ge 256 ]] &&
+                    highlight_format=xterm256
+                highlight --replace-tabs="$HIGHLIGHT_TABWIDTH" \
+                    --out-format="$highlight_format" --style="$HIGHLIGHT_STYLE" \
+                    --force -- "$FILE_PATH" || true
+                exit 0
+            fi
+            if command -v bat >/dev/null 2>&1; then
+                bat --color=always --style=plain --line-range=:500 -- "$FILE_PATH" || true
+                exit 0
+            fi
+            if command -v pygmentize >/dev/null 2>&1; then
+                local pygmentize_format=terminal
+                [[ "$(tput colors 2>/dev/null || printf 0)" -ge 256 ]] &&
+                    pygmentize_format=terminal256
+                if pygmentize -g -f "$pygmentize_format" \
+                    -O "style=$PYGMENTIZE_STYLE" -- "$FILE_PATH" 2>/dev/null; then
+                    exit 0
+                fi
+            fi
+            sed -n '1,500p' "$FILE_PATH"
+            exit 0
+            ;;
+        image/*)
+            if [[ "${lf_user_images:-true}" == true ]] &&
+                command -v chafa >/dev/null 2>&1; then
+                local format
+                format="$(image_format)"
+                case "$format" in
+                    sixel)
+                        chafa -f sixel -s "${PV_WIDTH}x${PV_HEIGHT}" \
+                            --animate off --polite off -- "$FILE_PATH" && exit 0
+                        ;;
+                    symbols)
+                        chafa -f symbols -s "${PV_WIDTH}x${PV_HEIGHT}" \
+                            --animate off --polite off -- "$FILE_PATH" && exit 0
+                        ;;
+                    *)
+                        chafa -f "$format" -s "${PV_WIDTH}x${PV_HEIGHT}" \
+                            --animate off --polite off -- "$FILE_PATH" && exit 0
+                        ;;
+                esac
+                if [[ "$format" != symbols ]]; then
+                    chafa -f symbols -s "${PV_WIDTH}x${PV_HEIGHT}" \
+                        --animate off --polite off -- "$FILE_PATH" && exit 0
+                fi
+            fi
+            try exiftool "$FILE_PATH" && exit 0
+            try identify "$FILE_PATH" && exit 0
+            ;;
+        video/*|audio/*)
+            try mediainfo "$FILE_PATH" && exit 0
+            try exiftool "$FILE_PATH" && exit 0
+            try ffprobe -hide_banner "$FILE_PATH" && exit 0
+            ;;
+    esac
+}
+
+MIMETYPE="$(file_mime "$FILE_PATH")"
+handle_extension
+handle_mime "$MIMETYPE"
+
+printf '%s\n' '----- File Type Classification -----'
+file_description "$FILE_PATH"
+exit 0

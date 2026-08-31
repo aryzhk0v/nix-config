@@ -1,0 +1,69 @@
+#!/bin/sh
+
+# Copy ranger-style path variants to the first available clipboard provider.
+
+set -eu
+
+kind="${1:-path}"
+case "$kind" in
+    stdin)
+        content="$(cat)"
+        ;;
+    path)
+        content="${fx:-${f:-}}"
+        ;;
+    dir)
+        content="$PWD"
+        ;;
+    name|stem)
+        content=''
+        old_ifs=$IFS
+        IFS='
+'
+        for path in ${fx:-${f:-}}; do
+            value="${path##*/}"
+            [ "$kind" != stem ] || value="${value%.*}"
+            if [ -n "$content" ]; then content="$content
+$value"; else content="$value"; fi
+        done
+        IFS=$old_ifs
+        ;;
+    *)
+        printf 'unknown clipboard value: %s\n' "$kind" >&2
+        exit 2
+        ;;
+esac
+
+copy_with() {
+    printf '%s' "$content" | "$@"
+}
+
+# Prefer the native provider on macOS. On Linux, try the active display
+# protocol first, then fall back to any provider that happens to be available.
+if [ "$(uname -s)" = Darwin ] && command -v pbcopy >/dev/null 2>&1; then
+    copy_with pbcopy && exit 0
+fi
+if [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-copy >/dev/null 2>&1; then
+    copy_with wl-copy && exit 0
+fi
+if [ -n "${DISPLAY:-}" ] && command -v xsel >/dev/null 2>&1; then
+    copy_with xsel -i -b && exit 0
+fi
+if [ -n "${DISPLAY:-}" ] && command -v xclip >/dev/null 2>&1; then
+    copy_with xclip -i -selection clipboard && exit 0
+fi
+if command -v pbcopy >/dev/null 2>&1; then
+    copy_with pbcopy && exit 0
+fi
+if command -v wl-copy >/dev/null 2>&1; then
+    copy_with wl-copy && exit 0
+fi
+if command -v xsel >/dev/null 2>&1; then
+    copy_with xsel -i -b && exit 0
+fi
+if command -v xclip >/dev/null 2>&1; then
+    copy_with xclip -i -selection clipboard && exit 0
+fi
+
+printf '%s\n' 'No working clipboard provider found (pbcopy, wl-copy, xsel, or xclip).' >&2
+exit 1

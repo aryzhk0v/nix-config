@@ -7,14 +7,17 @@
 
   home.packages = with pkgs; [
     bat
+    chafa
     chawan
     curl
     dig
     eza
     fd
+    file
     fdupes
     fzf
     gh
+    less
     lf
     monolith
     ncdu
@@ -22,6 +25,7 @@
     pass
     rclone
     ripgrep
+    tree
   ];
 
   programs.git = {
@@ -43,6 +47,10 @@
 	  "${pkgs.zsh}/share/zsh/$ZSH_VERSION/functions"
 	  $fpath
 	)
+      fi
+
+      if [[ -r "$HOME/.config/lf/lfcd.sh" ]]; then
+	source "$HOME/.config/lf/lfcd.sh"
       fi
     '';
     oh-my-zsh = {
@@ -84,6 +92,9 @@
     l = "eza -l";
     cat = "bat";
   };
+
+  # The scripts choose the appropriate macOS or Linux tools at runtime.
+  xdg.configFile."lf".source = ./config/lf;
 
   # Keep this value unchanged after the initial installation.
   home.stateVersion = "26.05";

@@ -39,6 +39,7 @@ in
       "firefox"
       "grandperspective"
       "hammerspoon"
+      "karabiner-elements"
       "openlogi"
       "visual-studio-code"
     ];
@@ -54,7 +55,7 @@ in
       inherit inputs username;
     };
 
-    users.${username} = { ... }: {
+    users.${username} = { config, ... }: {
       imports = [ ./home.nix ];
 
       home.username = username;
@@ -66,6 +67,13 @@ in
       # Hammerspoon reads its configuration from ~/.hammerspoon/init.lua.
       home.file.".hammerspoon/init.lua".source =
         ./config/hammerspoon/init.lua;
+
+      # Keep Karabiner's configuration writable so its GUI can update it.
+      # Karabiner requires the directory, rather than karabiner.json itself,
+      # to be the symbolic link.
+      xdg.configFile."karabiner".source =
+        config.lib.file.mkOutOfStoreSymlink
+          "${homeDirectory}/.config/home-manager/config/karabiner";
 
       # Alacritty is installed manually, but its configuration is declarative.
       xdg.configFile."alacritty/alacritty.toml".text = ''

@@ -92,6 +92,7 @@ in
         regex = "(ipfs:|ipns:|magnet:|mailto:|gemini://|gopher://|https://|http://|news:|file:|git://|ssh:|ftp://)[^\u0000-\u001F\u007F-\u009F<>\"\\s{-}\\^⟨⟩`\\\\]+"
 
         [selection]
+	semantic_escape_chars = ",│`|\"' ()[]{}<>\t"
         save_to_clipboard = true
 
         [font.normal]

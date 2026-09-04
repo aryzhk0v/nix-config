@@ -17,6 +17,7 @@
     fdupes
     fzf
     gh
+    kubectl
     less
     lf
     monolith
